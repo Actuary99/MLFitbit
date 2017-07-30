@@ -1,0 +1,90 @@
+---
+title: "Final Project - Machine Learning"
+author: "Daniel Flick"
+date: "June 11, 2017"
+output:
+  md_document: null
+  html_document: default
+  variant: markdown_github
+---
+##Executive Summary
+
+The purpose of this project is to use a training data set to build a model to successfully forecast the 
+the manner in which certain exercises were performed.  The model will use data from exercise bands to perform
+the forecast.
+
+```{r}
+
+library(caret)
+
+library(randomForest)
+
+setwd("C:/Users/djflick/My Documents/Machine Learning/Week 4/Final Project")
+
+training<-read.csv("pml-training.csv",header=T,stringsAsFactors=F)
+testing<-read.csv("pml-testing.csv",header=T,stringsAsFactors=F)
+
+#Split training set into a validation set and a true training set.  We are asked for an out of sample
+#estimate of the error, and a validation set, comprised of a portion of the originla training data
+#set, will help us estimate this error
+
+set.seed(13000)
+inBuild<-createDataPartition(y=training$classe,p=0.7,list=FALSE)
+validation<-training[-inBuild,]; buildData<-training[inBuild,]
+
+#so now I have a training set, a validation set, and a test set
+
+```
+
+#Clean the data
+
+There are many variables with NA's.  First, let's keep only those variables that have values not equal to a blank
+or an NA at least 80% of the time.  We could choose to eliminate these observations - or replace their NA values with the average of values with similar characteristics.  For simplicity, we will first simply choose to eliminate them.  If the accuracy of the validation set is unacceptable, we can try other methods, but let's try the simplest option first.
+
+We also note that some of the columns have no useful connection to the way in which the exercises were performed, notably the first 5 variables.  Therefore, we will eliminate these variables from the data sets (training, validation, and test).  Again, if the accuracy of the predictions for the 'validation' set are poor (or if our cross-validation results are unacceptable), we can think about whether some of them do, indeed, add value.  Also, if the results of the cross-validation tests are poor, we can think about whether we should include interactions between certain variables.  
+
+```{r}
+
+value<-apply(buildData,2,function(x) sum(x != "" & !is.na(x)))
+keep<-ifelse(value>=.80*nrow(buildData),TRUE,FALSE)                      
+
+buildData<-buildData[,keep]; validation<-validation[,keep]; testing<-testing[,keep]
+
+#Next, let's throw out the first 5 columns, which have no logical predictive power
+
+buildData<-buildData[,6:ncol(buildData)]
+validation<-validation[,6:ncol(validation)]
+testing<-testing[,6:ncol(testing)]
+
+model<-train(classe~., data=buildData, method="rf")
+
+model$finalModel
+
+
+```
+
+We are asked to predict the out of sample error, which is best estimated by the error on the 'validation' data set.  We see from the results that the out of sample error is very low, 0.17%.  This is because the 'accuracy' of the validation data set is shown to be 0.9983.  This reflects very well on the random forest method, which is obviously a very good technique for this data set, producing results that are nearly perfectly in-line with the actual results.  We would therefore expect the predictions for the 'test' set to be equally accurate.
+
+```{r}
+
+#Calculate the accuracy of the model on the validation set.  This serves as a proxy for the accuracy of the 
+# model on the 'testing' set (out of sample set)
+
+pred<-predict(model,newdata=validation)
+
+confusionMatrix(pred,validation$classe)
+
+
+```
+
+#Finally, project the response on the test set
+
+```{r}
+
+predtest<-predict(model,newdata=testing)
+
+predtest
+
+```
+
+These are the predicted manners in which the various exercises were performed.  These results were entered into the Week 4 quiz, which shows 100% accuracy.
